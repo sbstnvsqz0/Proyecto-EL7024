@@ -7,16 +7,16 @@
 ### Requisitos
 
 * Python ≥ 3.9
-* Librerías: `torch`, `numpy`, `scikit-learn`, `pandas`, `matplotlib`
+* Librerías: `torch`, `numpy`, `scikit-learn`, `pandas`, `matplotlib`, `PyYAML`
 
 ```bash
-pip install torch numpy scikit-learn pandas matplotlib
+pip install torch numpy scikit-learn pandas matplotlib PyYAML
 ```
 
 ### Archivos principales
 
 * `problem.py` — define y registra problemas de estimación (incluye **moons** y **blobs**).
-* `solve_simple.py` — entrena un MLP **sin dropout** (baseline “No dropout”), **solo CSVs** (sin gráficos).
+* `solver.py` — entrena varios MLP con parámetros definidos en archivos .yaml, **solo CSVs** (sin gráficos).
 * `benchmark.py` — **genera plots y resúmenes** a partir de los CSVs (curvas, confusión, scatter 2D).
 
 ### Estructura de carpetas (se crea automáticamente)
@@ -52,7 +52,7 @@ benchmarks_plots/
 
 ### Configuración (sin flags)
 
-Todos los parámetros se editan **dentro del código**:
+Todos los parámetros se editan **dentro del .yaml**:
 
 * En `solve_simple.py` modifica el dict `CONFIG`:
 
