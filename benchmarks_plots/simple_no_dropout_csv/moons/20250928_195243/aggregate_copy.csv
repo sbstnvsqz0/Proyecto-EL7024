@@ -1,0 +1,2 @@
+problem,method_dir,run_id,n_seeds,test_acc_mean,test_acc_std,test_f1_macro_mean,test_f1_macro_std,best_epoch_mean,best_epoch_std
+moons,simple_no_dropout_csv,20250928_195243,3,0.9733333333333332,0.0015590239111558,0.973330382392219,0.0015607653907058,38.0,2.449489742783178

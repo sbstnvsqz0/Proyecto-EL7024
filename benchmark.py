@@ -1,7 +1,7 @@
 # benchmark.py
 from __future__ import annotations
-import os, glob, csv
-from typing import Dict, Any, List, Tuple
+import os, glob
+from typing import Dict, Any, List
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,11 +13,11 @@ from problem import get_problem
 # =========================
 BENCH_CFG: Dict[str, Any] = {
     "root": "results",
-    "problems": ["moons", "blobs"],                     # ajusta según lo corrido
-    "method_dirs": ["simple_no_dropout_csv"],           # añade otros métodos si quieres
+    "problems": ["moons", "blobs"],          # ajusta según lo corrido
+    "method_dirs": ["dropout_vanilla_0_2"],  # añade otros métodos si quieres
     "out": "benchmarks_plots",
     # para escoger el "mejor seed" por run
-    "best_seed_metric": "val_loss",   # "val_loss" (mínimo) o "val_acc" (máximo) — debe coincidir con solve
+    "best_seed_metric": "val_loss",          # "val_loss" (mínimo) o "val_acc" (máximo)
 }
 
 def ensure_dir(p: str):
@@ -48,7 +48,7 @@ def choose_best_seed(seed_dirs: List[str], prefer_metric: str = "val_loss") -> s
     según el nombre en 'val_metric_name'. Si 'prefer_metric' difiere del guardado,
     se usa el guardado.
     """
-    best_dir, best_val = None, None
+    best_dir, best_val, best_name = None, None, None
     for sd in seed_dirs:
         s = read_csv(os.path.join(sd, "summary.csv"))
         if s is None or s.empty: continue
@@ -59,10 +59,13 @@ def choose_best_seed(seed_dirs: List[str], prefer_metric: str = "val_loss") -> s
         val = float(val)
         if name == "val_loss":  # queremos mínimo
             better = (best_val is None) or (val < best_val)
-        else:  # val_acc -> máximo
+        else:                   # val_acc -> máximo
             better = (best_val is None) or (val > best_val)
         if better:
-            best_val = val; best_dir = sd
+            best_val = val; best_dir = sd; best_name = name
+    # print informativo
+    if best_dir is not None:
+        print(f"[INFO] Best seed: {os.path.basename(best_dir)} ({best_name}={best_val:.6f})")
     return best_dir
 
 def aggregate_curves(seed_dirs: List[str]) -> pd.DataFrame | None:
@@ -130,6 +133,7 @@ def scatter_moons_with_errors(seed_dir: str, args_kv: Dict[str, Any], out_png: s
     """
     Reconstruye los datos estandarizados (X_vis, y_vis) y el split de test
     con la misma semilla y parámetros, y sobrepone mal clasificados del test.
+    IMPORTANTE: Se espera que seed_dir y args_kv provengan de la MISMA seed.
     """
     # reconstruir config
     problem = args_kv.get("problem", "moons")
@@ -141,9 +145,9 @@ def scatter_moons_with_errors(seed_dir: str, args_kv: Dict[str, Any], out_png: s
         "noise": float(args_kv.get("noise", 0.2)) if args_kv.get("noise","") != "" else 0.2,
         "centers": int(float(args_kv.get("centers", 4))) if args_kv.get("centers","") != "" else 4,
         "cluster_std": float(args_kv.get("cluster_std", 1.5)) if args_kv.get("cluster_std","") != "" else 1.5,
-        "val_size": float(args_kv.get("val_size", 0.2)),
-        "test_size": float(args_kv.get("test_size", 0.2)),
-        "batch_size": int(float(args_kv.get("batch_size", 128))),
+        "val_size": float(args_kv.get("val_size", 0.2)) if args_kv.get("val_size","") != "" else 0.2,
+        "test_size": float(args_kv.get("test_size", 0.2)) if args_kv.get("test_size","") != "" else 0.2,
+        "batch_size": int(float(args_kv.get("batch_size", 128))) if args_kv.get("batch_size","") != "" else 128,
         "stratify": True if str(args_kv.get("stratify","True")).lower() == "true" else False
     }
     spec = get_problem(problem)
@@ -167,33 +171,42 @@ def scatter_moons_with_errors(seed_dir: str, args_kv: Dict[str, Any], out_png: s
     pdf = read_csv(pred_path)
     if pdf is None or pdf.empty: return
     y_pred = pdf["y_pred"].values.astype(int)
+    y_true_csv = pdf["y_true"].values.astype(int)
+
+    # Guard anti-desalineamiento
+    if y_true_csv.shape != y_test.shape or not np.array_equal(y_true_csv, y_test):
+        print(f"[WARN] y_true de CSV no coincide con y_test reconstruido para {seed_dir}. "
+              f"Revisa que args.csv y predictions_* provengan de la MISMA seed.")
+        return
 
     # Máscara de errores
     mis = (y_pred != y_test)
 
     # Plot
     fig, ax = plt.subplots(figsize=(6.0, 5.6))
-    sc = ax.scatter(X_vis[:,0], X_vis[:,1], c=y_vis, s=10, alpha=0.5, edgecolor="none", cmap="tab10")
-    # Sobreponer mal clasificados del test
+    ax.scatter(X_vis[:,0], X_vis[:,1], c=y_vis, s=10, alpha=0.5, edgecolor="none", cmap="tab10")
     ax.scatter(X_test[mis,0], X_test[mis,1], marker="x", s=45, linewidths=1.5, c="k", label="Misclassified (test)")
-    ax.set_title("Moons — standardized space\nAll points (true labels) + misclassified test samples")
+    ttl = "Moons" if problem == "moons" else ("Blobs" if problem == "blobs" else problem)
+    ax.set_title(f"{ttl} — standardized space\nAll points (true labels) + misclassified test samples")
     ax.set_xlabel("x1 (std)"); ax.set_ylabel("x2 (std)")
     ax.legend(loc="upper right")
     fig.tight_layout(); fig.savefig(out_png, dpi=150); plt.close(fig)
 
 def bar_seed_accuracies(seed_dirs: List[str], out_png: str):
-    vals = []
+    vals, names = [], []
     for sd in seed_dirs:
         m = read_csv(os.path.join(sd, "metrics.csv"))
         if m is None or m.empty: continue
         row = m.loc[m["split"] == "test"]
         if row.empty: continue
         vals.append(float(row.iloc[0]["acc"]))
+        names.append(os.path.basename(sd))
     if not vals: return
-    fig, ax = plt.subplots(figsize=(5.2, 4.2))
+    fig, ax = plt.subplots(figsize=(5.6, 4.2))
     ax.bar(range(len(vals)), vals)
     ax.set_title("Test accuracy per seed")
-    ax.set_xlabel("seed idx (order of discovery)"); ax.set_ylabel("accuracy")
+    ax.set_xlabel("seed dir idx (order)"); ax.set_ylabel("accuracy")
+    ax.set_xticks(range(len(vals))); ax.set_xticklabels([n.split("_")[-1] for n in names])
     fig.tight_layout(); fig.savefig(out_png, dpi=150); plt.close(fig)
 
 def main():
@@ -216,7 +229,9 @@ def main():
 
                 # Descubrir seeds
                 seed_dirs = sorted([d for d in glob.glob(os.path.join(run_dir, "seed_*")) if os.path.isdir(d)])
-                if not seed_dirs: continue
+                if not seed_dirs: 
+                    print(f"[WARN] No seed_* en {run_dir}")
+                    continue
 
                 # 1) Curvas agregadas
                 curves_agg = aggregate_curves(seed_dirs)
@@ -230,14 +245,13 @@ def main():
                     plot_confusion_from_csv(os.path.join(best_seed, "confusion_matrix.csv"),
                                             os.path.join(out_run, "confusion_best_seed.png"))
 
-                # 3) Scatter 2D para moons/blobs 2D mostrando errores del test (usa args.csv + problem.py)
-                # Tomamos cualquier seed (la primera) solo para recuperar args y reconstruir splits
-                args_kv = read_kv_csv(os.path.join(seed_dirs[0], "args.csv"))
-                if problem == "moons":
-                    scatter_moons_with_errors(best_seed or seed_dirs[0], args_kv, os.path.join(out_run, "scatter_moons_errors.png"))
-                elif problem == "blobs":
-                    # (opcional) repetir la misma lógica para blobs 2D
-                    scatter_moons_with_errors(best_seed or seed_dirs[0], args_kv, os.path.join(out_run, "scatter_blobs_errors.png"))
+                # 3) Scatter 2D mostrando errores del test
+                # Usar SIEMPRE la MISMA seed para args y preds → best_seed si existe
+                seed_for_plots = best_seed or seed_dirs[0]
+                args_kv = read_kv_csv(os.path.join(seed_for_plots, "args.csv"))
+                if problem in ("moons", "blobs"):
+                    scatter_moons_with_errors(seed_for_plots, args_kv,
+                        os.path.join(out_run, f"scatter_{problem}_errors.png"))
 
                 # 4) Barras de accuracy por seed
                 bar_seed_accuracies(seed_dirs, os.path.join(out_run, "test_acc_per_seed.png"))
@@ -245,7 +259,6 @@ def main():
                 # 5) Resumen CSV del run (desde aggregate.csv si existe)
                 agg_csv = os.path.join(run_dir, "aggregate.csv")
                 if os.path.exists(agg_csv):
-                    # Copia a carpeta del benchmark por conveniencia
                     df = pd.read_csv(agg_csv)
                     df.to_csv(os.path.join(out_run, "aggregate_copy.csv"), index=False)
 
