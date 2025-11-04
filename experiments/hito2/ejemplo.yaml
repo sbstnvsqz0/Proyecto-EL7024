@@ -1,0 +1,23 @@
+seeds: [0, 1, 2]
+
+preprocessing_config:
+  size: 96
+  mean: 0.1307
+  std: 0.3081
+
+model_config:
+  hidden_dim: 100
+  out_dim: 10
+  dropout:
+    type: standard #"standard" | "information"
+    p: 0.2
+    initial_logvar: -5
+
+train_config:
+  epochs: 80
+  batch_size: 128
+  lr: 0.07
+  weight_decay: 0.0
+  optimizer: "adam"
+  criterion: "cross_entropy"
+  beta: 0.1
