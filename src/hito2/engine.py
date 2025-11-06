@@ -2,17 +2,20 @@ from .paper_blocks import FullyConnectedPaper
 from typing import Dict, Any
 import torch
 from tqdm import tqdm
-from src.utils import (set_seed, device_auto,set_criterion,set_optimizer)
+from src.utils import (set_seed, device_auto,set_criterion,set_optimizer, save_losses)
 import os
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
+import numpy as np
 
 class EngineMLP:
-    def __init__(self, seed, save_model_dir, mlp_config: Dict[str, Any], train_config: Dict[str, Any]):
+    def __init__(self, seed, save_model_dir, save_losses_dir, save_plots_dir, mlp_config: Dict[str, Any], train_config: Dict[str, Any]):
         self.seed = seed
         set_seed(self.seed)
         self.device = device_auto()
         self.save_model_dir = save_model_dir
+        self.save_losses_dir = save_losses_dir
+        self.save_plots_dir = save_plots_dir
         self.model = FullyConnectedPaper(**mlp_config).to(self.device)
         self.epochs = train_config["epochs"]
         self.batch_size = train_config["batch_size"]
@@ -75,15 +78,41 @@ class EngineMLP:
 
             epoch_pbar.set_postfix(
             train_loss=f"{train_loss:.4f}",
-            train_acc=f"{train_acc:.2f}%",
+            train_acc=f"{train_acc*100:.2f}%",
             val_loss=f"{val_loss:.4f}",
-            val_acc=f"{val_acc:.2f}%")
+            val_acc=f"{val_acc*100:.2f}%")
             if epoch<self.step_size+1:    #Solo una actualización del lr como en el paper
                 self.scheduler.step()
             if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
                 self.save_dict(epoch)
+        print("Entrenamiento Terminado")
+        self.save_losses()
         
+    def evaluate(self,dataset):
+        dataloader = DataLoader(dataset,batch_size=1,shuffle=False)
+        self.model.eval()
+        real_labels = []
+        pred_labels = []
+        with torch.no_grad():
+            total_loss = 0.0   
+            for x, y in tqdm(dataloader, desc="Testing", leave=False):
+                x, y = x.to(self.device), y.to(self.device)
+                output, kl_loss = self.model(x)
+                loss = self.criterion(output, y) + self.beta*kl_loss/x.size(0)
+                total_loss += loss.item() * x.size(0)
+                real_labels.append(y.cpu().item()); pred_labels.append(output.argmax(dim=1).cpu().item())
+
+            total_loss/=len(dataset)
+        acc = np.sum(real_labels==pred_labels)/len(dataset)
+        dict_results = {"real_labels":real_labels,
+                        "pred_labels":pred_labels,
+                        "accuracy":acc,
+                        "loss": total_loss}
+
+        return dict_results
+
+
     def save_dict(self,epoch):
         print(f"Saving checkpoint to {self.save_model_dir}...")
         torch.save({
@@ -93,8 +122,17 @@ class EngineMLP:
             'scheduler_state_dict': self.scheduler.state_dict()
         }, os.path.join(self.save_model_dir,f"{self.seed}.pth"))
 
-    def return_losses(self):
-        return {"train":self.train_loss, "val":self.val_loss}
+    def load_model(self,path):
+        checkpoint = torch.load(path,map_location=torch.device(self.device))
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+
+    def save_losses(self):
+        losses_dict={"train_losses":self.train_loss,"val_losses":self.val_loss}
+        save_losses(losses_dict=losses_dict,
+                    losses_dir=self.save_losses_dir,
+                    plots_dir=self.save_plots_dir,
+                    seed=self.seed)
+    
 
 
     

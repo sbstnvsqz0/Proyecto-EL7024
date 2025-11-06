@@ -77,10 +77,10 @@ class FullyConnectedPaper(nn.Module):
         x1,kl_loss1 = self.first_mlp(x)
         x2,kl_loss2 = self.second_mlp(x1)
         x3,kl_loss3 = self.third_mlp(x2)
-        output = self.out_mlp(x3)
+        logits = self.out_mlp(x3)
         kl_loss = kl_loss1 + kl_loss2 + kl_loss3
 
-        return output,kl_loss
+        return logits,kl_loss
     
         
 
