@@ -9,15 +9,15 @@ class InformationDropout(nn.Module):
         self.max_var = 0.7 #Paper: To avoid this problem, we constraint alpha(x) < 0.7
     def forward(self,x):
         var = torch.exp(self.logvar)
-        var = torch.clamp(var, 0, self.max_var) #clamping to avoid numerical instability
+        var = torch.clamp(var, 1e-6, self.max_var) #clamping to avoid numerical instability
         if self.training:
             noise = torch.randn_like(x) * torch.sqrt(var) #N(0,var)
-            output = x*(1+noise)
+            output = x*(1+noise)    #N(x,var)
+            kl_loss = -torch.log(var).sum() #sum para las caracteristicas
         else: 
             output=x
+            kl_loss = 0.0 #No se aplica ruido en evaluación
             
-        kl_loss = -torch.log(var).sum()
-
         return output, kl_loss
         
 
@@ -36,8 +36,8 @@ class MLPBlock(nn.Module):
             dropout_layer = InformationDropout(input_features=out_dim, initial_logvar=dropout["initial_logvar"])
         
         self.mlp_layer = nn.Linear(in_dim,out_dim)
-        self.activation = nn.ReLU()
         self.dropout_layer = dropout_layer
+        self.activation = nn.ReLU()
 
     def forward(self,x):
         x = self.mlp_layer(x)

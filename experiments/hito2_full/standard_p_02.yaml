@@ -6,7 +6,7 @@ preprocessing_config:
   std: 0.3081
 
 model_config:
-  hidden_dim: 100
+  hidden_dim: 1000
   out_dim: 10
   dropout:
     type: standard #"standard" | "information"
@@ -14,7 +14,7 @@ model_config:
     initial_logvar: -5
 
 train_config:
-  epochs: 80
+  epochs: 40
   batch_size: 128
   lr: 0.07
   optimizer: "sgd" #"adam" | "sgd"

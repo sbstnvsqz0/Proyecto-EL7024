@@ -2,11 +2,12 @@ from .paper_blocks import FullyConnectedPaper
 from typing import Dict, Any
 import torch
 from tqdm import tqdm
-from src.utils import (set_seed, device_auto,set_criterion,set_optimizer, save_losses)
+from src.utils import (set_seed, device_auto,set_criterion, save_losses)
 import os
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 import numpy as np
+from torch.optim import Adam, SGD
 
 class EngineMLP:
     def __init__(self, seed, save_model_dir, save_losses_dir, save_plots_dir, mlp_config: Dict[str, Any], train_config: Dict[str, Any]):
@@ -20,12 +21,9 @@ class EngineMLP:
         self.epochs = train_config["epochs"]
         self.batch_size = train_config["batch_size"]
         self.lr = train_config["lr"]
-        self.weight_decay = train_config["weight_decay"]
         self.criterion = set_criterion(train_config["criterion"])
-        optimizer_class = set_optimizer(train_config["optimizer"])
-        self.optimizer = optimizer_class(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        self.step_size = 30
-        self.scheduler = StepLR(self.optimizer, step_size=self.step_size, gamma=0.1) #
+        self.optimizer = Adam(self.model.parameters(),lr=self.lr) if train_config["optimizer"]=="adam" else SGD(self.model.parameters(),lr=self.lr,momentum=0.9) #Paper usa SGD con momentum
+        self.scheduler = MultiStepLR(self.optimizer, milestones=[15,35], gamma=0.1) #Entrenamiento en paper disminuye learning rate en 0.1 en épocas 30 y 70; se entrena la mitad de epocas, entonces se dividieron por 2
         self.beta = train_config["beta"]
         
 
@@ -48,14 +46,13 @@ class EngineMLP:
                 x, y = x.to(self.device), y.to(self.device)
                 self.optimizer.zero_grad()
                 output, kl_loss = self.model(x)
-                kl_loss = kl_loss/x.size(0)  
-                loss = self.criterion(output, y) + self.beta*kl_loss    
+                loss = self.criterion(output, y) + self.beta*kl_loss/x.size(0)
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item() * x.size(0)
                 train_acc += (output.argmax(dim=1) == y).sum().item()
                 total += x.size(0) 
-
+            self.scheduler.step()
             train_loss /= total
             train_acc /= total
             self.train_loss.append(train_loss)
@@ -81,11 +78,11 @@ class EngineMLP:
             train_acc=f"{train_acc*100:.2f}%",
             val_loss=f"{val_loss:.4f}",
             val_acc=f"{val_acc*100:.2f}%")
-            if epoch<self.step_size+1:    #Solo una actualización del lr como en el paper
-                self.scheduler.step()
+            
             if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
                 self.save_dict(epoch)
+
         print("Entrenamiento Terminado")
         self.save_losses()
         

@@ -17,10 +17,25 @@ def set_criterion(criterion:str):
     assert criterion in ["cross_entropy"]
     return CrossEntropyLoss()
 
-def set_optimizer(optimizer:str):
-    from torch.optim import Adam
-    assert optimizer in ["adam"]
-    return Adam
+
+def create_folders(exp_file:str):
+    #Se crea carpeta results/nombre_de_experimento
+    exp_name = exp_file.split(os.sep)[-1].split(".")[0]
+    folder_experiments = os.path.join(os.sep.join(exp_file.split(os.sep)[:-1]),"results",exp_name)
+    os.makedirs(folder_experiments,exist_ok=True)
+    #Se crea carpeta results/nombre_de_experimento/models
+    model_save_dir = os.path.join(folder_experiments,"models")
+    os.makedirs(model_save_dir,exist_ok=True)
+    #Se crea carpeta results/nombre_de_experimento/losses
+    losses_save_dir = os.path.join(folder_experiments,"losses")
+    os.makedirs(losses_save_dir,exist_ok=True)
+    #Se crea carpeta results/nombre_de_experimento/predictions
+    preds_save_dir = os.path.join(folder_experiments,"predictions")
+    os.makedirs(preds_save_dir,exist_ok=True)
+    #Se crea carpeta results/nombre_de_experimento/plots
+    plots_save_dir = os.path.join(folder_experiments,"plots")
+    os.makedirs(plots_save_dir,exist_ok=True)
+    return folder_experiments,model_save_dir,losses_save_dir,preds_save_dir,plots_save_dir
 
 def plot_losses(losses_dict:dict,plots_dir:str,seed:int,save:bool=True):
     assert "train_losses" in losses_dict.keys() and "val_losses" in losses_dict.keys(), "keys de diccionario losses incompleto"
