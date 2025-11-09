@@ -15,8 +15,8 @@ class InformationDropout(nn.Module):
             output = x*(1+noise)    #N(x,var)
             kl_loss = -torch.log(var).sum() #sum para las caracteristicas
         else: 
-            output=x
-            kl_loss = 0.0 #No se aplica ruido en evaluación
+            output=x    #No se aplica ruido en evaluación
+            kl_loss = -torch.log(var).sum() 
             
         return output, kl_loss
         
@@ -63,22 +63,23 @@ class FullyConnectedPaper(nn.Module):
         self.first_mlp = MLPBlock(in_dim=in_dim,
                                   out_dim=hidden_dim,
                                   dropout=dropout)
-        self.second_mlp = MLPBlock(in_dim=hidden_dim,
-                                  out_dim=hidden_dim,
-                                  dropout=dropout)
-        self.third_mlp = MLPBlock(in_dim=hidden_dim,
-                                  out_dim=hidden_dim,
-                                  dropout=dropout)
+        #self.second_mlp = MLPBlock(in_dim=hidden_dim,
+        #                          out_dim=hidden_dim,
+        #                          dropout=dropout)
+        #self.third_mlp = MLPBlock(in_dim=hidden_dim,
+        #                          out_dim=hidden_dim,
+        #                          dropout=dropout)
         self.out_mlp = nn.Linear(hidden_dim,out_dim)
         
 
     def forward(self, x: torch.Tensor):
         x = nn.Flatten()(x) #Aplana entrada para asegurar que entra un vector
         x1,kl_loss1 = self.first_mlp(x)
-        x2,kl_loss2 = self.second_mlp(x1)
-        x3,kl_loss3 = self.third_mlp(x2)
-        logits = self.out_mlp(x3)
-        kl_loss = kl_loss1 + kl_loss2 + kl_loss3
+        #x2,kl_loss2 = self.second_mlp(x1)
+        #x3,kl_loss3 = self.third_mlp(x2)
+        logits = self.out_mlp(x1)
+        #kl_loss = kl_loss1 + kl_loss2 + kl_loss3
+        kl_loss = kl_loss1
 
         return logits,kl_loss
     
