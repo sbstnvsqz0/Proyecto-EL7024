@@ -1,173 +1,160 @@
-# Proyecto-EL7024
+````markdown
+# Proyecto-EL7024: Comparación de Standard vs. Information Dropout (Hito 2)
 
-**Information-Theoretic Dropout in Neural Networks**
+Este repositorio implementa un pipeline de experimentación para comparar **Standard Dropout** contra **Information Dropout** (con varianza estática) en un modelo MLP para el dataset MNIST.
+
+El proyecto está diseñado para ser un **pipeline automatizado**:
+1.  **Configuración** centralizada mediante archivos `.yaml`.
+2.  **Orquestación** de múltiples corridas (configuraciones x semillas) con un script principal.
+3.  **Agregación** automática de resultados en un CSV final.
+
+---
 
 ## 1) Ejecución
 
 ### Requisitos
 
 * Python ≥ 3.9
-* Librerías: `torch`, `numpy`, `scikit-learn`, `pandas`, `matplotlib`
+* Librerías: disponibles en `requirements.txt`
 
 ```bash
-pip install torch numpy scikit-learn pandas matplotlib
+pip install -r requirements.txt
+````
+
+### Archivos Principales
+
+  * `run_experiments.py` — **(Orquestador)** Script principal que lee una carpeta de `.yaml`, itera sobre todas las configuraciones y semillas, y ejecuta `train_and_test.py` para cada una. Finalmente, llama a `summarize_experiments.py`.
+  * `train_and_test.py` — **(Ejecutor)** Ejecuta *un* solo experimento para *una* sola semilla. Carga la data, inicializa el `EngineMLP`, entrena, evalúa y guarda los artefactos (modelo `.pth`, `losses.csv`, plots, etc.).
+  * `summarize_experiments.py` — **(Agregador)** Recolecta los resultados de *todas* las corridas, calcula estadísticas (media, std) y guarda un `summary_experiments.csv` global.
+  * `engine.py` — **(Motor)** Define la clase `EngineMLP`, que encapsula la lógica de entrenamiento, validación, evaluación, optimizador, scheduler y el cálculo de la pérdida combinada (BCE + β\*KL).
+  * `paper_blocks.py` — **(Modelo)** Define la arquitectura del modelo, incluyendo `InformationDropout`, `MLPBlock` y `FullyConnectedPaper`.
+
+### Estructura de Carpetas
+
+La estructura del código fuente es:
+
+```
+.
+│   run_experiments.py        # 1. El orquestador que se ejecuta
+│   summarize_experiments.py  # 3. El agregador (llamado por el orquestador)
+│   requirements.txt
+│   README.md
+│
+├───experiments/              # ⚙️ Carpeta con las configuraciones
+│   │   .gitignore
+│   │
+│   └───hito2_64_compresion_static/ # Un "banco" de experimentos
+│           info_beta_0001.yaml     # Configuración para 1 experimento
+│           info_beta_001.yaml
+│           ...
+│
+├───src/                      # 🧠 Código fuente
+│   │   utils.py              # Funciones (crear carpetas, plots)
+│   │
+│   └───hito2/
+│           engine.py
+│           paper_blocks.py
+│           train_and_test.py # 2. El ejecutor (llamado por el orquestador)
+│
+└───notebooks/                # 📊 Análisis y visualización
+        data_visualization.ipynb
 ```
 
-### Archivos principales
-
-* `problem.py` — define y registra problemas de estimación (incluye **moons** y **blobs**).
-* `solve_simple.py` — entrena un MLP **sin dropout** (baseline “No dropout”), **solo CSVs** (sin gráficos).
-* `benchmark.py` — **genera plots y resúmenes** a partir de los CSVs (curvas, confusión, scatter 2D).
-
-### Estructura de carpetas (se crea automáticamente)
+Al ejecutarse, se crea la siguiente estructura de **resultados**:
 
 ```
-results/
-  {problem}/
-    {method_dir}/
-      {run_id}/
-        seed_{k}/
-          args.csv
-          curves.csv
-          metrics.csv
-          summary.csv
-          classification_report.csv
-          confusion_matrix.csv
-          predictions_train.csv
-          predictions_val.csv
-          predictions_test.csv
-        aggregate.csv
-
-benchmarks_plots/
-  {method_dir}/
-    {problem}/
-      {run_id}/
-        curves_aggregate.csv
-        curves_aggregate.png
-        confusion_best_seed.png
-        scatter_moons_errors.png   # si problem=moons (o blobs en 2D)
-        test_acc_per_seed.png
-        aggregate_copy.csv
+experiments/
+  {experiment_name}/              (ej. hito2_64_compresion_static)
+    results/
+      {config_name}/              (ej. info_beta_0001)
+        models/
+          {seed}.pth
+        losses/
+          losses_{seed}.csv
+        plots/
+          losses_plot_{seed}.png
+          confusion_matrix_{seed}.png
+        predictions/
+          test_{seed}.csv
+        summary_test.csv          # Resumen de métricas para esta config (agregado por seed)
+    summary_experiments.csv       # <-- RESUMEN FINAL (agregado por config)
 ```
 
-### Configuración (sin flags)
+### Cómo Correr el Pipeline Completo
 
-Todos los parámetros se editan **dentro del código**:
+1.  **Configurar el "banco" de experimentos**:
 
-* En `solve_simple.py` modifica el dict `CONFIG`:
+      * Abre `run_experiments.py` y edita la variable `experiment_name` para que apunte a la carpeta de configuración que deseas ejecutar (ej. `hito2_64_compresion_static`).
 
-  * `CONFIG["run"]`: `problem` (`"moons"` o `"blobs"`), `method_dir`, `seeds`, etc.
-  * `CONFIG["data"]`: tamaño de dataset, ruido, splits, `batch_size`, etc.
-  * `CONFIG["model"]`: `hidden_sizes`, `activation`.
-  * `CONFIG["train"]`: `epochs`, `optimizer`, `lr`, `patience`, `val_metric`.
-* En `benchmark.py` modifica `BENCH_CFG`:
+    <!-- end list -->
 
-  * `root`, `problems`, `method_dirs`, carpeta de salida `out`.
-  * `best_seed_metric` para elegir el mejor seed por `val_loss` o `val_acc`.
+    ```python
+    # En run_experiments.py
+    experiment_name = "hito2_64_compresion_static"  # <-- Edita esta línea
+    ```
 
-### Cómo correr
+2.  **Ejecutar el orquestador**:
 
-1. **Entrenamiento baseline (solo CSVs):**
+    ```bash
+    python run_experiments.py
+    ```
 
-```bash
-python solve_simple.py
-```
+El script hará lo siguiente automáticamente:
 
-Genera, por `seed`, CSVs con:
+1.  Iterará sobre cada `.yaml` en la carpeta `experiments/hito2_64_compresion_static/`.
+2.  Para cada `.yaml`, leerá la lista de `seeds` y llamará a `python -m src.hito2.train_and_test ...` para cada semilla.
+3.  Una vez que **todas** las corridas terminen, ejecutará `python summarize_experiments.py`.
+4.  El resultado final consolidado aparecerá en `experiments/hito2_64_compresion_static/summary_experiments.csv`.
 
-* `args.csv` (parámetros del run)
-* `curves.csv` (por época: `train_loss`, `val_loss`, `train_acc`, `val_acc`)
-* `metrics.csv` (por split: `loss`, `acc`, `f1_macro`)
-* `classification_report.csv`, `confusion_matrix.csv`
-* `predictions_*.csv` (pares `y_true`, `y_pred` por split)
-* `summary.csv` (mejor época, métrica de validación, #params)
+-----
 
-Y un `aggregate.csv` a nivel de run (promedios ± std entre seeds).
+## 2\) Propósito y Funcionamiento
 
-2. **Benchmark + gráficos:**
+### `run_experiments.py` (Orquestador)
 
-```bash
-python benchmark.py
-```
+  * Su única función es automatizar la ejecución en bucle.
+  * Usa `subprocess.run()` para llamar a `train_and_test.py` como un módulo (`-m`). Esto asegura que cada corrida sea un proceso independiente.
+  * Espera a que todos los subprocesos de entrenamiento terminen antes de lanzar el script de resumen.
 
-Produce:
+### `train_and_test.py` (Ejecutor de 1 Run)
 
-* **Curvas agregadas** con banda de desviación: `curves_aggregate.(csv|png)`
-* **Matriz de confusión** del mejor seed: `confusion_best_seed.png`
-* **Scatter 2D** de **moons** (o blobs 2D) con **errores del test** remarcados: `scatter_moons_errors.png`
-* **Barras de accuracy por seed**: `test_acc_per_seed.png`
-* Copia del `aggregate.csv`: `aggregate_copy.csv`
+  * Es el "caballo de batalla" del pipeline. Está diseñado para ser llamado por el orquestador (o manualmente) con dos argumentos: `--experiment` (ruta al `.yaml`) y `--seed`.
+  * **Responsabilidades**:
+    1.  Leer el `.yaml` de configuración (`yaml.safe_load`).
+    2.  Llamar a `create_folders` (de `utils.py`) para crear la estructura de salida (`results/.../{seed}`).
+    3.  Cargar y pre-procesar el dataset (MNIST).
+    4.  Instanciar la clase `EngineMLP` con las configuraciones de modelo y entrenamiento.
+    5.  Si `train=True`, llama a `engine.train()`.
+    6.  Llama a `engine.load_model()` para cargar el mejor checkpoint guardado.
+    7.  Llama a `engine.evaluate()` en el conjunto de test.
+    8.  Guarda los resultados de la evaluación (`results_per_seed`).
 
-> Para añadir otro método (p. ej., `solve_dropout.py`), usa el **mismo contrato de salida** (CSV con los mismos nombres/columnas) y un `method_dir` distinto (ej. `dropout_p0.2`). Luego agrega ese `method_dir` en `BENCH_CFG["method_dirs"]`.
+### `summarize_experiments.py` (Agregador)
 
----
+  * Lee el argumento `--experiment` para saber qué carpeta de resultados analizar.
+  * Busca todos los archivos `summary_test.csv` (que contienen los resultados por semilla de *una* configuración).
+  * Concatena todos estos resúmenes.
+  * Calcula métricas agregadas (media y std) para `accuracy`, `kl_loss`, `bce_loss`, etc.
+  * Encuentra la `best_seed` (mejor semilla) basado en un criterio (ej. `accuracy` max o `kl_loss` min).
+  * Guarda el `DataFrame` final como `summary_experiments.csv`.
 
-## 2) Propósito y funcionamiento (funciones clave)
+### `engine.py` (Motor de ML)
 
-### `problem.py`
+  * Clase `EngineMLP` que contiene la lógica central de PyTorch.
+  * **`__init__`**: Inicializa el modelo (`FullyConnectedPaper`), el optimizador (`Adam` o `SGD`), el `scheduler` (`MultiStepLR`) y el criterio (`CrossEntropyLoss`). Fija la semilla (`set_seed`).
+  * **`train()`**: Contiene el bucle principal de entrenamiento y validación.
+      * Calcula la pérdida combinada: `loss = self.criterion(output, y) + self.beta * kl_loss`.
+      * Maneja `tqdm` para las barras de progreso.
+      * Implementa **Early Stopping** implícito al guardar solo el mejor modelo (`self.save_dict()`) cuando `val_loss` disminuye.
+  * **`evaluate()`**: Bucle de evaluación (sin `torch.no_grad()`) que calcula las pérdidas `bce_loss` y `kl_loss` por separado en el conjunto de test.
+  * **`save_dict()` / `load_model()`**: Manejan el guardado y carga de checkpoints (`.pth`).
+  * **`save_losses()`**: Guarda el CSV de `train_losses` y `val_losses` por época.
 
-* **`ProblemSpec`** (dataclass): especificación de un problema.
+### `paper_blocks.py` (Arquitectura del Modelo)
 
-  * `name`, `task`, `n_features`, `n_classes`, `build_datasets`, `default_*`, `plotting`.
-* **Registro `PROBLEMS`**: diccionario con problemas disponibles.
-* **`get_problem(name)`**: devuelve la `ProblemSpec` registrada.
-* **`build_moons(cfg)` / `build_blobs(cfg)`**:
+  * **`InformationDropout`**: Implementación de Dropout Variacional con **varianza estática**. La `logvar` es un `nn.Parameter` (un vector de tamaño `input_features`) que se aprende, pero no depende de la entrada `x`.
+  * **`InformationDropoutMLP`**: (No usada en tus configs, pero presente) Implementación con **varianza dinámica**, donde `logvar` es predicha por una `nn.Linear` que depende de `x`.
+  * **`MLPBlock`**: Un bloque modular que aplica `Linear -> ReLU -> Dropout`. El bloque maneja la lógica de qué tipo de dropout usar ("standard" o "information\_static") y retorna `kl_loss = 0` si es standard.
+  * **`FullyConnectedPaper`**: El modelo final. Es una secuencia de `MLPBlock` que suma las `kl_loss` de cada capa (aunque en tu implementación actual solo usas una capa con KL).
 
-  * Generan datos sintéticos (scikit-learn), dividen en **train/val/test** con `train_test_split`.
-  * **Estandarizan** usando estadísticas de *train* (vía `StandardScaler`).
-  * Devuelven: `{"loaders": …, "n_features", "n_classes", "X_vis", "y_vis", "class_names", "plotting"}`.
-
-    * `X_vis`/`y_vis` (ya estandarizados) permiten graficar fronteras o scatter 2D en el **benchmark**.
-* **Privadas**: `_standardize_split`, `_to_loaders`.
-
-  * Aseguran que los `DataLoader`s de validación y test **no se barajen**, para alinear con las predicciones guardadas.
-
-### `solve_simple.py` (baseline **sin dropout**, **solo CSVs**)
-
-* **CONFIG**: único punto de edición (sin CLI). Define problema, datos, modelo y entrenamiento.
-* **`SimpleMLP`**: MLP secuencial lineal + activación; **no** incluye Dropout.
-* **Entrenamiento**:
-
-  * **`train_one_seed`**: fija semillas, construye datasets, instancia el modelo y entrena con **early stopping** (`val_loss` o `val_acc`).
-  * Guarda por época en `curves.csv` y, al final, métricas por split en `metrics.csv`.
-  * Exporta `predictions_*.csv` (necesarias para los gráficos del benchmark).
-  * `classification_report.csv` y `confusion_matrix.csv` se derivan del split test.
-  * `summary.csv` almacena: mejor época, métrica de validación y número de parámetros.
-* **Helpers**:
-
-  * `evaluate_loss_acc`, `predict_all` (evaluación/predicción batcheada).
-  * `EarlyStopping` (lógica de parada temprana).
-  * `write_*_csv` (salidas tabulares homogéneas).
-
-### `benchmark.py` (plots + agregación)
-
-* **BENCH_CFG**: raíz de resultados (`root`), `problems`, `method_dirs`, carpeta de salida y métrica para elegir el mejor seed.
-* **Descubrimiento y carga**:
-
-  * `find_runs` (encuentra `run_id`s), lectura de `curves.csv`, `metrics.csv`, `summary.csv`, `predictions_test.csv`.
-* **Selección del mejor seed**:
-
-  * `choose_best_seed`: lee `summary.csv` por seed y escoge el que tenga la mejor `val_metric_value` según `val_metric_name`.
-* **Agregación de curvas**:
-
-  * `aggregate_curves`: promedia (y calcula std) `train/val loss/acc` por época, luego genera `curves_aggregate.(csv|png)`.
-* **Gráficos**:
-
-  * `plot_curves_aggregate`: 2 paneles (loss y accuracy) con bandas de ±1σ.
-  * `plot_confusion_from_csv`: reconstruye la matriz desde `confusion_matrix.csv` y la dibuja con anotaciones.
-  * `scatter_moons_with_errors`:
-
-    * Reconstruye el dataset estandarizado **con la misma semilla y parámetros** (usando `problem.get_problem` y `args.csv`).
-    * Carga `predictions_test.csv`, marca **muestras mal clasificadas** (`x` negras) sobre el **scatter** de todos los puntos (coloreados por etiqueta verdadera).
-  * `bar_seed_accuracies`: barras de `accuracy` en test para cada seed del run.
-* **Salidas**:
-
-  * CSV y PNG en `benchmarks_plots/{method}/{problem}/{run_id}/`, listos para informe.
-
----
-
-**Notas**
-
-* El baseline reproduce el comparador **“No dropout”** del paper; es la línea base para luego integrar un `solve_dropout.py` (Dropout clásico) o un cuello tipo IB/VIB.
-* Para **moons**/**blobs** con más de 2 features, el scatter 2D usa las dos primeras dimensiones estandarizadas; si no es 2D, el benchmark omite el scatter.
-* Si quieres comparar varios métodos, corre cada uno con un `method_dir` distinto y añádelo a `BENCH_CFG["method_dirs"]` para graficarlos/organizarlos por separado.
+<!-- end list -->
