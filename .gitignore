@@ -1,6 +1,6 @@
 data
-benchmarks_plots
 results
+benchmarks_plots
 **pyc
 utils
 solve_dropout.py

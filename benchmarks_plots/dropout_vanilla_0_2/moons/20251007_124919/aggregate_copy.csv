@@ -1,2 +1,0 @@
-problem,method_dir,run_id,n_seeds,test_acc_mean,test_acc_std,test_f1_macro_mean,test_f1_macro_std,best_epoch_mean,best_epoch_std
-moons,dropout_vanilla_0_2,20251007_124919,3,0.9745833333333334,0.0015590239111557,0.9745797471484297,0.0015623208463275,67.66666666666667,17.594190960528863
