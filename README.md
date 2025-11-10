@@ -1,4 +1,3 @@
-````markdown
 # Proyecto-EL7024: Comparación de Standard vs. Information Dropout (Hito 2)
 
 Este repositorio implementa un pipeline de experimentación para comparar **Standard Dropout** contra **Information Dropout** (con varianza estática) en un modelo MLP para el dataset MNIST.
@@ -92,6 +91,7 @@ experiments/
     # En run_experiments.py
     experiment_name = "hito2_64_compresion_static"  # <-- Edita esta línea
     ```
+    NOTA: `hito2_64_compresion_static` y `hito2_32_compresion_static` son los experimentos que se incluyeron en el reporte entregado.
 
 2.  **Ejecutar el orquestador**:
 
