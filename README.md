@@ -17,6 +17,9 @@ El proyecto está diseñado para ser un **pipeline automatizado**:
 * Librerías: disponibles en `requirements.txt`
 
 ```bash
+git clone https://github.com/sbstnvsqz0/Proyecto-EL7024.git
+cd Proyecto-EL7024
+git checkout hito2
 pip install -r requirements.txt
 ````
 
