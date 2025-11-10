@@ -1,20 +1,18 @@
 seeds: [0,1,2]
 
 preprocessing_config:
-  size: 96
-  mean: 0.1307
-  std: 0.3081
-
+  size: 24 #Tamaño original de set MNIST
+  
 model_config:
-  hidden_dim: 100
+  hidden_dim: 32
   out_dim: 10
   dropout:
     type: standard #"standard" | "information"
-    p: 0.2
+    p: 0.1
     initial_logvar: -5
 
 train_config:
-  epochs: 80
+  epochs: 40
   batch_size: 128
   lr: 0.07
   optimizer: "sgd" #"adam" | "sgd"

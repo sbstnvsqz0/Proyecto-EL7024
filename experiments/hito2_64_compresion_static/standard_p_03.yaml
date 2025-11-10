@@ -4,11 +4,11 @@ preprocessing_config:
   size: 24 #Tamaño original de set MNIST
   
 model_config:
-  hidden_dim: 1000
+  hidden_dim: 64
   out_dim: 10
   dropout:
     type: standard #"standard" | "information"
-    p: 0.2
+    p: 0.3
     initial_logvar: -5
 
 train_config:

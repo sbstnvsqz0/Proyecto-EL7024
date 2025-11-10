@@ -95,7 +95,7 @@ def plot_confusion_matrix(real_values, pred_values, save_dir,seed,set_name,save=
         plt.show()
     
 
-def results_per_seed(results_dict:dict,preds_save_dir:str,plots_save_dir:str,seed:int,set_name:str):
+def results_per_seed(results_dict:dict,preds_save_dir:str,plots_save_dir:str,summary_dir:str,seed:int,set_name:str,n_seeds:int):
     print(f"Saving preds in {preds_save_dir}")
     df_preds = pd.DataFrame({"real_label":results_dict["real_labels"],
                             "pred_label":results_dict["pred_labels"]})
@@ -109,6 +109,23 @@ def results_per_seed(results_dict:dict,preds_save_dir:str,plots_save_dir:str,see
                         set_name=set_name,
                         save=True,
                         figsize=(8, 6))
+    print("Done!")
+    print(f"Saving summary results in {summary_dir}")
+    df_summary = pd.DataFrame({ "seed":[seed],
+                                "accuracy":[results_dict["accuracy"]],
+                               "kl_loss":[results_dict["kl_loss"]],
+                               "bce_loss":[results_dict["bce_loss"]],
+                               "total_loss":[results_dict["kl_loss"]+results_dict["bce_loss"]]})
+    summary_path = os.path.join(summary_dir,f"summary_{set_name}.csv")
+    if not os.path.isfile(summary_path):
+        df_summary.to_csv(summary_path,index=False)
+    else:
+        if len(pd.read_csv(summary_path)) >= n_seeds:
+            df_summary.to_csv(summary_path,index=False)
+        else:
+            df_existing = pd.read_csv(summary_path)
+            df_updated = pd.concat([df_existing,df_summary],ignore_index=True)
+            df_updated.to_csv(summary_path,index=False)
     print("Done!")
 
 

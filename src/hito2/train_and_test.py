@@ -15,10 +15,13 @@ def main():
     parser = argparse.ArgumentParser(prog='Train and Test')
     parser.add_argument('--experiment', type=str) #.yaml
     parser.add_argument('--seed',type=int)  #seed
+    parser.add_argument('--train',type=str,default="True")
 
     args = parser.parse_args()
     exp_file = args.experiment
     seed = args.seed
+    train = args.train
+    train = False if str(train).lower() == "false" else True
 
     assert exp_file.endswith(".yaml"), "Se debe ingresar un archivo .yaml"
 
@@ -29,6 +32,7 @@ def main():
     with open(exp_file, 'r') as file:
         exp_config = yaml.safe_load(file)
 
+    n_seeds = len(exp_config["seeds"])
     preprocessing_config = exp_config["preprocessing_config"]
     model_config = exp_config["model_config"]
     train_config = exp_config["train_config"]
@@ -52,9 +56,9 @@ def main():
                     save_plots_dir = plots_save_dir,
                     mlp_config=model_config, 
                     train_config=train_config)
-
-    engine.train(train_dataset=train_dataset,
-                val_dataset=test_dataset)
+    if train:
+        engine.train(train_dataset=train_dataset,
+                    val_dataset=test_dataset)
 
     engine.load_model(os.path.join(model_save_dir,f"{seed}.pth"))
     
@@ -63,7 +67,9 @@ def main():
     results_per_seed(results_dict=test_results,
                     preds_save_dir=preds_save_dir,
                     plots_save_dir=plots_save_dir,
+                    summary_dir=folder_experiments,
                     seed=seed,
+                    n_seeds=n_seeds,
                     set_name="test")
     
     

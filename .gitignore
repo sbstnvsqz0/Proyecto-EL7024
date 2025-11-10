@@ -2,3 +2,8 @@ data
 benchmarks_plots
 results
 **pyc
+utils
+solve_dropout.py
+solve_simple.py
+benchmark.py
+problem.py

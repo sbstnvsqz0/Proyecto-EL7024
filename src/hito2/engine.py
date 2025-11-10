@@ -32,8 +32,8 @@ class EngineMLP:
         self.val_loss = []
 
     def train(self,train_dataset,val_dataset):
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,num_workers=6)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,num_workers=6)
         epoch_pbar = tqdm(range(self.epochs), desc="Epochs")
 
         for epoch in epoch_pbar:
@@ -46,7 +46,7 @@ class EngineMLP:
                 x, y = x.to(self.device), y.to(self.device)
                 self.optimizer.zero_grad()
                 output, kl_loss = self.model(x)
-                loss = self.criterion(output, y) + self.beta*kl_loss/x.size(0)
+                loss = self.criterion(output, y) + self.beta*kl_loss
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item() * x.size(0)
@@ -65,7 +65,7 @@ class EngineMLP:
                 for x, y in tqdm(val_loader, desc="Validation", leave=False):
                     x, y = x.to(self.device), y.to(self.device)
                     output, kl_loss = self.model(x)
-                    loss = self.criterion(output, y) + self.beta*kl_loss/x.size(0)
+                    loss = self.criterion(output, y) + self.beta*kl_loss
                     val_loss += loss.item() * x.size(0)
                     val_acc += (output.argmax(dim=1) == y).sum().item()
                     total += x.size(0)
@@ -92,20 +92,28 @@ class EngineMLP:
         real_labels = []
         pred_labels = []
         with torch.no_grad():
-            total_loss = 0.0   
+            total_bce_loss = 0.0   
+            total_kl_loss = 0.0
             for x, y in tqdm(dataloader, desc="Testing", leave=False):
                 x, y = x.to(self.device), y.to(self.device)
                 output, kl_loss = self.model(x)
-                loss = self.criterion(output, y) + self.beta*kl_loss/x.size(0)
-                total_loss += loss.item() * x.size(0)
+                bce_loss = self.criterion(output, y)
+                total_bce_loss += bce_loss.item()
+                if type(kl_loss)==int:
+                    total_kl_loss += self.beta*kl_loss
+                else:
+                    total_kl_loss += self.beta*kl_loss.item()
                 real_labels.append(y.cpu().item()); pred_labels.append(output.argmax(dim=1).cpu().item())
 
-            total_loss/=len(dataset)
-        acc = np.sum(real_labels==pred_labels)/len(dataset)
+            total_kl_loss/=len(dataset)
+            total_bce_loss/=len(dataset)
+        real_labels=np.array(real_labels); pred_labels=np.array(pred_labels)
+        acc = 100*np.sum(real_labels==pred_labels)/len(dataset)
         dict_results = {"real_labels":real_labels,
                         "pred_labels":pred_labels,
                         "accuracy":acc,
-                        "loss": total_loss}
+                        "kl_loss": total_kl_loss,
+                        "bce_loss": total_bce_loss}
 
         return dict_results
 

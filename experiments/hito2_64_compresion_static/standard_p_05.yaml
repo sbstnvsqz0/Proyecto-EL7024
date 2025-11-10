@@ -2,13 +2,13 @@ seeds: [0,1,2]
 
 preprocessing_config:
   size: 24 #Tamaño original de set MNIST
-
+  
 model_config:
-  hidden_dim: 1000
+  hidden_dim: 64
   out_dim: 10
   dropout:
-    type: information #"standard" | "information"
-    p: 0.2
+    type: standard #"standard" | "information"
+    p: 0.5
     initial_logvar: -5
 
 train_config:

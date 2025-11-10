@@ -1,8 +1,7 @@
 *
 
 !.gitignore
-!hito2
-!hito2/ejemplo.yaml
-!hito2_full
-!hito2_full/info_beta_01.yaml
-!hito2_full/standard_p_02.yaml
+!hito2_32_compresion_static
+!hito2_32_compresion_static/*.yaml
+!hito2_64_compresion_static
+!hito2_64_compresion_static/*.yaml

@@ -1,8 +1,9 @@
 import torch.nn as nn
 import torch
 from typing import List, Dict, Any
+import math
 
-class InformationDropout(nn.Module):
+class InformationDropout(nn.Module): #Utiliza var estática
     def __init__(self,input_features: int,initial_logvar: float = 0.0):
         super().__init__()
         self.logvar = nn.Parameter(torch.full((input_features,), initial_logvar,dtype=torch.float32))
@@ -19,6 +20,35 @@ class InformationDropout(nn.Module):
             kl_loss = -torch.log(var).sum() 
             
         return output, kl_loss
+    
+class InformationDropoutMLP(nn.Module): #Utiliza var dependiente de la entrada
+    def __init__(self,input_features: int,initial_logvar: float = 0.0):
+        super().__init__()
+        assert initial_logvar <=0, "initial_logvar debe ser menor o igual a 0"
+        self.logvar_predictor = nn.Linear(input_features, input_features)
+        self.max_var = 0.7 #Paper: To avoid this problem, we constraint alpha(x) < 0.7 
+        self.log_max_var = math.log(self.max_var)   
+        self.log_min_var = math.log(1e-6)              
+        
+    
+        init_logvar = max(min(initial_logvar, self.log_max_var), self.log_min_var)
+        nn.init.zeros_(self.logvar_predictor.weight) #Se inicializan pesos en 0 
+        nn.init.constant_(self.logvar_predictor.bias, init_logvar) #Se inicializa bias para que inicialmente var=exp(initial_logvar.biases)
+
+    def forward(self,x):
+        logvar = self.logvar_predictor(x)
+        logvar = torch.clamp(logvar, self.log_min_var, self.log_max_var) #clamping to avoid numerical instability
+        var = torch.exp(logvar)
+
+        kl_loss = torch.mean(torch.sum(-torch.log(var),dim=1)) #mean over batch, sum over features
+        if self.training:
+            noise = torch.randn_like(x) * torch.sqrt(var) #N(0,var)
+            output = x*(1+noise)    #N(x,var)
+
+        else: 
+            output=x    #No se aplica ruido en evaluación
+
+        return output, kl_loss
         
 
 class MLPBlock(nn.Module):
@@ -27,13 +57,15 @@ class MLPBlock(nn.Module):
                  out_dim:int,
                  dropout:Dict[str, Any]):
         super().__init__()
-        assert dropout["type"] in ["standard","information"]
+        assert dropout["type"] in ["standard","information_static","information"]
         self.dropout_type = dropout["type"]
 
         if self.dropout_type == "standard":
             dropout_layer = nn.Dropout(dropout["p"])
-        else:
+        elif self.dropout_type == "information_static":
             dropout_layer = InformationDropout(input_features=out_dim, initial_logvar=dropout["initial_logvar"])
+        else: #information
+            dropout_layer = InformationDropoutMLP(input_features=out_dim, initial_logvar=dropout["initial_logvar"])
         
         self.mlp_layer = nn.Linear(in_dim,out_dim)
         self.dropout_layer = dropout_layer
@@ -58,7 +90,6 @@ class FullyConnectedPaper(nn.Module):
                  out_dim:int,
                  dropout:Dict[str, Any]):
         super().__init__()
-        assert dropout["type"] in ["standard","information"]
 
         self.first_mlp = MLPBlock(in_dim=in_dim,
                                   out_dim=hidden_dim,
