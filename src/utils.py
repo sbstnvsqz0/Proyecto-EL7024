@@ -54,10 +54,30 @@ def plot_losses(losses_dict:dict,plots_dir:str,seed:int,save:bool=True):
         plt.close()
     else:
         plt.show()
+        
+def plot_kl_losses(losses_dict:dict,plots_dir:str,seed:int,save:bool=True):
+    assert "train_kl_losses" in losses_dict.keys() and "val_kl_losses" in losses_dict.keys(), "keys de diccionario losses incompleto"
+    assert len(losses_dict["train_kl_losses"])==len(losses_dict["val_kl_losses"]), "losses tienen largos distintos"
+    lenght = len(losses_dict["train_kl_losses"])
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(lenght), losses_dict["train_kl_losses"], label="Train KL Loss")
+    plt.plot(range(lenght), losses_dict["val_kl_losses"], label="Val KL Loss")
+    plt.legend()
+    plt.xlabel("Epoch")
+    plt.ylabel("KL Loss")
+    title = f"KL Losses\nseed {seed}"
+    plt.title(title)
+    if save:
+        plt.savefig(os.path.join(plots_dir,f"kl_losses_plot_{seed}.png"))
+        plt.close()
+    else:
+        plt.show()
 
 def save_losses(losses_dict:dict,losses_dir:str, plots_dir:str, seed:int):
     assert "train_losses" in losses_dict.keys() and "val_losses" in losses_dict.keys(), "keys de diccionario losses incompleto"
     assert len(losses_dict["train_losses"])==len(losses_dict["val_losses"]), "losses tienen largos distintos"
+    assert "train_kl_losses" in losses_dict.keys() and "val_kl_losses" in losses_dict.keys(), "keys de diccionario losses incompleto"
+    assert len(losses_dict["train_kl_losses"])==len(losses_dict["val_kl_losses"]), "kl losses tienen largos distintos"
     print(f"Saving losses csv in {losses_dir}")
     df = pd.DataFrame(losses_dict)
     df.to_csv(os.path.join(losses_dir,f"losses_{seed}.csv"),index=False)
@@ -65,7 +85,9 @@ def save_losses(losses_dict:dict,losses_dir:str, plots_dir:str, seed:int):
     print(f"Saving losses plot in {plots_dir}")
     plot_losses(losses_dict=losses_dict,plots_dir=plots_dir,seed=seed,save=True)
     print("Done!")
-
+    print(f"Saving kl losses plot in {plots_dir}")
+    plot_kl_losses(losses_dict=losses_dict,plots_dir=plots_dir,seed=seed,save=True)
+    print("Done!")
 
     
 def plot_confusion_matrix(real_values, pred_values, save_dir,seed,set_name,save=True,figsize=(8, 6)):
