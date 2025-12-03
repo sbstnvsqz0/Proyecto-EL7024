@@ -74,6 +74,7 @@ class MLPBlock(nn.Module):
     def forward(self,x):
         z = self.mlp_layer(x)
         z = self.activation(z)
+
         if self.dropout_type == "standard":
             z = self.dropout_layer(z)
             kl_loss = 0

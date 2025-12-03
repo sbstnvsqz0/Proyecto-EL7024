@@ -5,7 +5,7 @@ import os
 import yaml
 from torchvision import transforms
 from src.utils import results_per_seed, save_losses, create_folders
-
+from .noises_transforms import choose_noise
 DATA_FOLDER = "data"
 
 def main():
@@ -37,11 +37,17 @@ def main():
     model_config = exp_config["model_config"]
     train_config = exp_config["train_config"]
 
-    #Inicialización de Datasets
-    preprocessing = transforms.Compose([
-        transforms.Resize(preprocessing_config["size"]),
-        transforms.ToTensor(),
-    ])
+    if "noise" in preprocessing_config.keys():
+        #Inicialización de Datasets
+        preprocessing = transforms.Compose([
+            transforms.Resize(preprocessing_config["size"]),
+            transforms.ToTensor(),
+            choose_noise(noise_type=preprocessing_config["noise"]["type"], param=preprocessing_config["noise"]["param"])
+        ])
+    else:
+        preprocessing = transforms.Compose([
+            transforms.Resize(preprocessing_config["size"]),
+            transforms.ToTensor()])
 
     model_config["in_dim"] = preprocessing_config["size"]**2 #Se configura la entrada del modelo según el resize
 
@@ -61,8 +67,8 @@ def main():
                     val_dataset=test_dataset)
 
     engine.load_model(os.path.join(model_save_dir,f"{seed}.pth"))
-    
     test_results = engine.evaluate(dataset = test_dataset)
+    engine.export_relu_histogram(dataset=test_dataset)
     # Genera csv con etiqueta real y predicha; matriz de confusión
     results_per_seed(results_dict=test_results,
                     preds_save_dir=preds_save_dir,

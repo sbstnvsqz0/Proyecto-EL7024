@@ -111,7 +111,7 @@ def plot_confusion_matrix(real_values, pred_values, save_dir,seed,set_name,save=
     plt.title(title)
     plt.tight_layout()
     if save:
-        plt.savefig(os.path.join(save_dir,f"confusion_matrix_{seed}.png"))
+        plt.savefig(os.path.join(save_dir,f"confusion_matrix_{set_name}_{seed}.png"))
         plt.close()
     else:
         plt.show()

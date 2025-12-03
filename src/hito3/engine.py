@@ -6,8 +6,10 @@ from src.utils import (set_seed, device_auto,set_criterion, save_losses)
 import os
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
+import torch.nn as nn
 import numpy as np
 from torch.optim import Adam, SGD
+from matplotlib import pyplot as plt
 
 class EngineMLP:
     def __init__(self, seed, save_model_dir, save_losses_dir, save_plots_dir, mlp_config: Dict[str, Any], train_config: Dict[str, Any]):
@@ -34,8 +36,8 @@ class EngineMLP:
         self.val_kl_loss = []
 
     def train(self,train_dataset,val_dataset):
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,num_workers=0)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,num_workers=0)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,num_workers=4)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,num_workers=4)
         epoch_pbar = tqdm(range(self.epochs), desc="Epochs")
 
         for epoch in epoch_pbar:
@@ -53,7 +55,7 @@ class EngineMLP:
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item() * x.size(0)
-                train_epoch_kl_loss += kl_loss.item() * x.size(0)
+                train_epoch_kl_loss += kl_loss * x.size(0)
                 train_acc += (output.argmax(dim=1) == y).sum().item()
                 total += x.size(0) 
             self.scheduler.step()
@@ -61,7 +63,10 @@ class EngineMLP:
             train_acc /= total
             train_epoch_kl_loss /= total
             self.train_loss.append(train_loss)
-            self.train_kl_loss.append(train_epoch_kl_loss)
+            try:
+                self.train_kl_loss.append(train_epoch_kl_loss.item())
+            except: 
+                self.train_kl_loss.append(train_epoch_kl_loss)
 
             self.model.eval()
             val_loss = 0.0
@@ -74,14 +79,17 @@ class EngineMLP:
                     output, kl_loss = self.model(x)
                     loss = self.criterion(output, y) + self.beta*kl_loss
                     val_loss += loss.item() * x.size(0)
-                    val_epoch_kl_loss += kl_loss.item() * x.size(0)
+                    val_epoch_kl_loss += kl_loss * x.size(0)
                     val_acc += (output.argmax(dim=1) == y).sum().item()
                     total += x.size(0)
             val_loss /= total
             val_acc /= total
             val_epoch_kl_loss /= total
             self.val_loss.append(val_loss)
-            self.val_kl_loss.append(val_epoch_kl_loss)
+            try:
+                self.val_kl_loss.append(val_epoch_kl_loss.item())
+            except:
+                self.val_kl_loss.append(val_epoch_kl_loss)
 
             epoch_pbar.set_postfix(
             train_loss=f"{train_loss:.4f}",
@@ -129,6 +137,26 @@ class EngineMLP:
 
         return dict_results
 
+    def export_relu_histogram(self,dataset):
+        self.model.out_mlp= nn.Identity()
+        dataloader = DataLoader(dataset,batch_size=1,shuffle=False)
+        self.model.eval()
+        outputs=[]
+        with torch.no_grad():
+            for x, y in tqdm(dataloader, desc="Exporting ReLU Histogram", leave=False):
+                x, y = x.to(self.device), y.to(self.device)
+                output, kl_loss = self.model(x)
+                outputs.append(output.cpu().numpy())
+        ouputs = np.array(outputs).reshape(-1)
+        bin_width = 0.1
+        bins = np.arange(min(ouputs), max(ouputs) + bin_width, bin_width)
+        plt.hist(ouputs,bins=bins,density=True,histtype='step', linewidth=2, color='blue')
+        plt.xlim(0,2.5)
+        plt.ylim(0,2)
+        plt.savefig(os.path.join(self.save_plots_dir,f"relu_histogram_{self.seed}.png"))    
+        plt.close()
+        return outputs
+
 
     def save_dict(self,epoch):
         print(f"Saving checkpoint to {self.save_model_dir}...")
@@ -154,9 +182,11 @@ class EngineMLP:
 
     
 class EngineMLPTest:
-    def __init__(self, mlp_config,device):
+    def __init__(self, mlp_config,train_config,device):
         self.model = FullyConnectedPaper(**mlp_config).to(device)
         self.device = device
+        self.criterion = set_criterion(train_config["criterion"])
+        self.beta = train_config["beta"]
 
     def load_model(self,path):
         checkpoint = torch.load(path,map_location=torch.device(self.device))
@@ -168,14 +198,25 @@ class EngineMLPTest:
         self.model.eval()
         real_labels = []
         pred_labels = []
+        total_bce_loss = 0.0   
+        total_kl_loss = 0.0
         with torch.no_grad():
             for x, y in tqdm(dataloader, desc="Testing", leave=False):
                 x, y = x.to(self.device), y.to(self.device)
                 output,kl_loss = self.model(x)
                 real_labels.append(y.cpu().item()); pred_labels.append(output.argmax(dim=1).cpu().item())
+                total_bce_loss += self.criterion(output, y).item()
+                if type(kl_loss)==int:
+                    total_kl_loss += self.beta*kl_loss
+                else:
+                    total_kl_loss += self.beta*kl_loss.item()
+        total_bce_loss /= len(test_dataset)
+        total_kl_loss /= len(test_dataset)
         real_labels=np.array(real_labels); pred_labels=np.array(pred_labels)
         acc = 100*np.sum(real_labels==pred_labels)/len(test_dataset)
         dict_results = {"real_labels":real_labels,
                         "pred_labels":pred_labels,
-                        "accuracy":acc}
+                        "accuracy":acc,
+                        "bce_loss":total_bce_loss,
+                        "kl_loss":total_kl_loss}
         return dict_results

@@ -1,12 +1,12 @@
 from torchvision.datasets import MNIST
-from.engine import EngineMLPTest
+from .engine import EngineMLPTest
 import argparse
 import os
 import yaml
 from torchvision import transforms
 import torch
 from src.hito3.noises_transforms import choose_noise
-from src.utils import set_seed, create_folders
+from src.utils import set_seed, create_folders, results_per_seed
 
 DATA_FOLDER = "data"
 
@@ -49,10 +49,16 @@ def main():
     model_config["in_dim"] = preprocessing_config["size"]**2 #Se configura la entrada del modelo según el resize
     
     test_set = MNIST(root=DATA_FOLDER, train=False, download=True, transform=preprocessing)
-    engine = EngineMLPTest(mlp_config=model_config, device="cuda" if torch.cuda.is_available() else "cpu")
+    engine = EngineMLPTest(mlp_config=model_config,train_config=train_config, device="cuda" if torch.cuda.is_available() else "cpu")
     engine.load_model(os.path.join(model_save_dir,f"{model_seed}.pth"))
     test_results = engine.test(test_set)
-    print(test_results)
+    results_per_seed(results_dict=test_results,
+                    preds_save_dir=preds_save_dir,
+                    plots_save_dir=plots_save_dir,
+                    summary_dir=folder_experiments,
+                    seed=model_seed,
+                    n_seeds=3,
+                    set_name=f"test_noisy_{noise_type}_{noise_param}")
     
 if __name__=="__main__":
     main()
