@@ -16,7 +16,7 @@ for experiment_name in experiments_name:
 
             seeds = exp_config["seeds"]
             for seed in seeds:
-                command = f"python -m src.hito3.train_and_test --experiment={yaml_path} --seed={seed} --get_histograms=True"
+                command = f"python -m src.hito3.train_and_test --experiment={yaml_path} --seed={seed}"
                 print(f'Running command: {command}')
 
                 time.sleep(2)

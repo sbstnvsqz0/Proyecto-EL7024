@@ -12,7 +12,21 @@ from torch.optim import Adam, SGD
 from matplotlib import pyplot as plt
 
 class EngineMLP:
+    """
+    Clase encargada del entrenamiento, validación y evaluación del modelo MLP.
+    """
     def __init__(self, seed, save_model_dir, save_losses_dir, save_plots_dir, mlp_config: Dict[str, Any], train_config: Dict[str, Any]):
+        """
+        Inicializa el motor de entrenamiento.
+
+        Args:
+            seed (int): Semilla para reproducibilidad.
+            save_model_dir (str): Directorio para guardar el modelo.
+            save_losses_dir (str): Directorio para guardar las pérdidas.
+            save_plots_dir (str): Directorio para guardar los gráficos.
+            mlp_config (Dict[str, Any]): Configuración del modelo MLP.
+            train_config (Dict[str, Any]): Configuración del entrenamiento (epochs, lr, etc.).
+        """
         self.seed = seed
         set_seed(self.seed)
         self.device = device_auto()
@@ -36,6 +50,14 @@ class EngineMLP:
         self.val_kl_loss = []
 
     def train(self,train_dataset,val_dataset,histogram_dataset):
+        """
+        Ejecuta el ciclo de entrenamiento y validación.
+
+        Args:
+            train_dataset (Dataset): Dataset de entrenamiento.
+            val_dataset (Dataset): Dataset de validación.
+            histogram_dataset (Dataset): Dataset para generar histogramas de activaciones (opcional).
+        """
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,num_workers=4)
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,num_workers=4)
         epoch_pbar = tqdm(range(self.epochs), desc="Epochs")
@@ -111,6 +133,15 @@ class EngineMLP:
         self.save_losses()
         
     def evaluate(self,dataset):
+        """
+        Evalúa el modelo en un dataset dado.
+
+        Args:
+            dataset (Dataset): Dataset a evaluar.
+
+        Returns:
+            dict: Diccionario con etiquetas reales, predichas y métricas (accuracy, losses).
+        """
         dataloader = DataLoader(dataset,batch_size=1,shuffle=False)
         self.model.eval()
         real_labels = []
@@ -142,6 +173,13 @@ class EngineMLP:
         return dict_results
 
     def export_activations(self,dataset,epoch:int):
+        """
+        Exporta las activaciones de la capa oculta a archivos .npy.
+
+        Args:
+            dataset (Dataset): Dataset para pasar por el modelo.
+            epoch (int): Número de época actual.
+        """
         original_out_mlp = self.model.out_mlp
         self.model.out_mlp= nn.Identity()
         dataloader = DataLoader(dataset,batch_size=1,shuffle=False)
@@ -163,6 +201,12 @@ class EngineMLP:
 
 
     def save_dict(self,epoch):
+        """
+        Guarda el estado del modelo, optimizador y scheduler.
+
+        Args:
+            epoch (int): Época actual.
+        """
         print(f"Saving checkpoint to {self.save_model_dir}...")
         torch.save({
             'epoch': epoch,
@@ -172,10 +216,19 @@ class EngineMLP:
         }, os.path.join(self.save_model_dir,f"{self.seed}.pth"))
 
     def load_model(self,path):
+        """
+        Carga los pesos del modelo desde un archivo.
+
+        Args:
+            path (str): Ruta al archivo .pth.
+        """
         checkpoint = torch.load(path,map_location=torch.device(self.device))
         self.model.load_state_dict(checkpoint["model_state_dict"])
 
     def save_losses(self):
+        """
+        Guarda las pérdidas de entrenamiento y validación usando la función utilitaria `save_losses`.
+        """
         losses_dict={"train_losses":self.train_loss,"val_losses":self.val_loss, "train_kl_losses":self.train_kl_loss, "val_kl_losses":self.val_kl_loss}
         save_losses(losses_dict=losses_dict,
                     losses_dir=self.save_losses_dir,
@@ -186,18 +239,44 @@ class EngineMLP:
 
     
 class EngineMLPTest:
+    """
+    Clase simplificada para probar un modelo ya entrenado.
+    """
     def __init__(self, mlp_config,train_config,device):
+        """
+        Inicializa el motor de prueba.
+
+        Args:
+            mlp_config (dict): Configuración del modelo.
+            train_config (dict): Configuración de entrenamiento (para criterio y beta).
+            device (torch.device): Dispositivo a utilizar.
+        """
         self.model = FullyConnectedPaper(**mlp_config).to(device)
         self.device = device
         self.criterion = set_criterion(train_config["criterion"])
         self.beta = train_config["beta"]
 
     def load_model(self,path):
+        """
+        Carga los pesos del modelo.
+
+        Args:
+            path (str): Ruta al archivo .pth.
+        """
         checkpoint = torch.load(path,map_location=torch.device(self.device))
         self.model.load_state_dict(checkpoint["model_state_dict"])
         print("Model loaded")
     
     def test(self,test_dataset):
+        """
+        Evalúa el modelo en el dataset de prueba.
+
+        Args:
+            test_dataset (Dataset): Dataset de prueba.
+
+        Returns:
+            dict: Diccionario con resultados y métricas.
+        """
         dataloader = DataLoader(test_dataset,batch_size=1,shuffle=False)
         self.model.eval()
         real_labels = []

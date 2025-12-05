@@ -4,11 +4,30 @@ from typing import List, Dict, Any
 import math
 
 class InformationDropout(nn.Module): #Utiliza var estática
+    """
+    Implementa Dropout Variacional con varianza estática (parámetro aprendible).
+    """
     def __init__(self,input_features: int,initial_logvar: float = 0.0):
+        """
+        Inicializa la capa de Information Dropout.
+
+        Args:
+            input_features (int): Número de características de entrada.
+            initial_logvar (float): Valor inicial para el logaritmo de la varianza.
+        """
         super().__init__()
         self.logvar = nn.Parameter(torch.full((input_features,), initial_logvar,dtype=torch.float32))
         self.max_var = 0.7 #Paper: To avoid this problem, we constraint alpha(x) < 0.7
     def forward(self,x):
+        """
+        Aplica el dropout variacional durante el entrenamiento.
+
+        Args:
+            x (torch.Tensor): Tensor de entrada.
+
+        Returns:
+            tuple: (output, kl_loss)
+        """
         var = torch.exp(self.logvar)
         var = torch.clamp(var, 1e-6, self.max_var) #clamping to avoid numerical instability
         if self.training:
@@ -22,7 +41,18 @@ class InformationDropout(nn.Module): #Utiliza var estática
         return output, kl_loss
     
 class InformationDropoutMLP(nn.Module): #Utiliza var dependiente de la entrada
+    """
+    Implementa Dropout Variacional con varianza dependiente de la entrada.
+    """
     def __init__(self,input_features: int,output_features:int, initial_logvar: float = 0.0):
+        """
+        Inicializa la capa de Information Dropout dinámico.
+
+        Args:
+            input_features (int): Dimensiones de entrada para predecir la varianza.
+            output_features (int): Dimensiones de salida (debe coincidir con las features a las que se aplica ruido).
+            initial_logvar (float): Valor inicial para el bias del predictor de varianza.
+        """
         super().__init__()
         assert initial_logvar <=0, "initial_logvar debe ser menor o igual a 0"
         self.logvar_predictor = nn.Linear(input_features, output_features)
@@ -36,6 +66,16 @@ class InformationDropoutMLP(nn.Module): #Utiliza var dependiente de la entrada
         nn.init.constant_(self.logvar_predictor.bias, init_logvar) #Se inicializa bias para que inicialmente var=exp(initial_logvar.biases)
 
     def forward(self,z,x):
+        """
+        Calcula la varianza basada en x y aplica ruido a z.
+
+        Args:
+            z (torch.Tensor): Mapa de características intermedio al que se aplicará ruido.
+            x (torch.Tensor): Entrada original (o anterior) usada para predecir la varianza.
+
+        Returns:
+            tuple: (output, kl_loss)
+        """
         # Z es el mapa de caracteristicas intermedio, X es la entrada completa con el cual se predice el ruido
         logvar = self.logvar_predictor(x)
         logvar = torch.clamp(logvar, self.log_min_var, self.log_max_var) #clamping to avoid numerical instability
@@ -53,10 +93,21 @@ class InformationDropoutMLP(nn.Module): #Utiliza var dependiente de la entrada
         
 
 class MLPBlock(nn.Module):
+    """
+    Bloque constructivo del MLP: Linear -> ReLU -> Dropout.
+    """
     def __init__(self,
                  in_dim:int,
                  out_dim:int,
                  dropout:Dict[str, Any]):
+        """
+        Inicializa el bloque MLP.
+
+        Args:
+            in_dim (int): Dimensión de entrada.
+            out_dim (int): Dimensión de salida.
+            dropout (Dict[str, Any]): Configuración del dropout.
+        """
         super().__init__()
         assert dropout["type"] in ["standard","information_static","information"]
         self.dropout_type = dropout["type"]
@@ -72,6 +123,15 @@ class MLPBlock(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self,x):
+        """
+        Paso forward del bloque.
+
+        Args:
+            x (torch.Tensor): Tensor de entrada.
+
+        Returns:
+            tuple: (z, kl_loss)
+        """
         z = self.mlp_layer(x)
         z = self.activation(z)
 
@@ -88,11 +148,23 @@ class MLPBlock(nn.Module):
         
 
 class FullyConnectedPaper(nn.Module):
+    """
+    Modelo MLP completo propuesto en el paper.
+    """
     def __init__(self, 
                  in_dim:int,
                  hidden_dim:int,
                  out_dim:int,
                  dropout:Dict[str, Any]):
+        """
+        Inicializa el modelo MLP.
+
+        Args:
+            in_dim (int): Dimensión de entrada.
+            hidden_dim (int): Dimensión de la capa oculta.
+            out_dim (int): Dimensión de salida.
+            dropout (Dict[str, Any]): Configuración del dropout.
+        """
         super().__init__()
 
         self.first_mlp = MLPBlock(in_dim=in_dim,
@@ -108,6 +180,15 @@ class FullyConnectedPaper(nn.Module):
         
 
     def forward(self, x: torch.Tensor):
+        """
+        Paso forward del modelo.
+
+        Args:
+            x (torch.Tensor): Tensor de entrada.
+
+        Returns:
+            tuple: (logits, kl_loss)
+        """
         x = nn.Flatten()(x) #Aplana entrada para asegurar que entra un vector
         x1,kl_loss1 = self.first_mlp(x)
         #x2,kl_loss2 = self.second_mlp(x1)
