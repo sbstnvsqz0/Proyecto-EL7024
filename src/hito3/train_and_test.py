@@ -24,7 +24,7 @@ def main():
     train = args.train
     get_histograms = args.get_histograms
     train = False if str(train).lower() == "false" else True
-    get_histograms = False if str(train).lower() == "false" else True
+    get_histograms = False if str(get_histograms).lower() == "false" else True
 
     assert exp_file.endswith(".yaml"), "Se debe ingresar un archivo .yaml"
 
