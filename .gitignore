@@ -8,3 +8,4 @@ solve_simple.py
 benchmark.py
 problem.py
 src/hito2
+src/hito3/test_noisy.py

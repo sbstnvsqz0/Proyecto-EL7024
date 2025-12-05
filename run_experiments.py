@@ -2,13 +2,8 @@ import os
 import subprocess
 import time
 import yaml
-#experiments_name = ["hito3_32_compresion_static_noisy_contrast_05",
-#                    "hito3_32_compresion_static_noisy_contrast_08",
-#                    "hito3_32_compresion_static_noisy_gaussian_03",
-#                    "hito3_32_compresion_static_noisy_gaussian_05",
-#                    "hito3_32_compresion_static_noisy_oclussion_03",
-#                    "hito3_32_compresion_static_noisy_oclussion_05"]
-experiments_name = ["hito3_32_compresion_mlp_original_v2"]
+
+experiments_name = ["hito3_32_compresion_mlp_original"]
 
 for experiment_name in experiments_name:
     yaml_dir = os.path.join("experiments",f"{experiment_name}")

@@ -1,7 +1,22 @@
 *
 
 !.gitignore
-!hito2_32_compresion_static
-!hito2_32_compresion_static/*.yaml
-!hito2_64_compresion_static
-!hito2_64_compresion_static/*.yaml
+!hito3_32_compresion_mlp_original
+!hito3_32_compresion_mlp_original/*.yaml
+!hito3_32_compresion_noisy_label_01
+!hito3_32_compresion_noisy_label_01/*.yaml
+!hito3_32_compresion_noisy_label_03
+!hito3_32_compresion_noisy_label_03/*.yaml
+!hito3_32_compresion_noisy_contrast_05
+!hito3_32_compresion_noisy_contrast_05/*.yaml
+!hito3_32_compresion_noisy_contrast_08
+!hito3_32_compresion_noisy_contrast_08/*.yaml
+!hito3_32_compresion_noisy_gaussian_03
+!hito3_32_compresion_noisy_gaussian_03/*.yaml
+!hito3_32_compresion_noisy_gaussian_05
+!hito3_32_compresion_noisy_gaussian_05/*.yaml
+!hito3_32_compresion_noisy_oclussion_03
+!hito3_32_compresion_noisy_oclussion_03/*.yaml
+!hito3_32_compresion_noisy_oclussion_05
+!hito3_32_compresion_noisy_oclussion_05/*.yaml
+

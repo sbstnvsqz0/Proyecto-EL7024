@@ -1,0 +1,23 @@
+seeds: [0,1,2]
+
+preprocessing_config:
+  size: 24 #Tamaño original de set MNIST
+  noise: 
+    type: contrast  #gaussian | random_oclussion | contrast | label
+    param: 0.8  #std | percentage | factor | percentage
+  
+model_config:
+  hidden_dim: 32
+  out_dim: 10
+  dropout:
+    type: standard #"standard" | "information"
+    p: 0.5
+    initial_logvar: -5
+
+train_config:
+  epochs: 40
+  batch_size: 128
+  lr: 0.07
+  optimizer: "sgd" #"adam" | "sgd"
+  criterion: "cross_entropy"
+  beta: 0.1
