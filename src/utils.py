@@ -4,6 +4,8 @@ import pandas as pd
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Subset
 
 def set_seed(seed:int):
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
@@ -149,5 +151,29 @@ def results_per_seed(results_dict:dict,preds_save_dir:str,plots_save_dir:str,sum
             df_updated = pd.concat([df_existing,df_summary],ignore_index=True)
             df_updated.to_csv(summary_path,index=False)
     print("Done!")
+
+
+def create_stratified_subset(seed, dataset, subset_size=0.1):
+        """
+        Crea un subset del dataset manteniendo la proporción de etiquetas.
+        subset_size: Flotante (0.0 a 1.0) representando la fracción del dataset a usar.
+        """
+
+        if hasattr(dataset, 'targets'):
+            labels = dataset.targets
+        else:
+            labels = [y.item() for _, y in DataLoader(dataset, batch_size=1, num_workers=0)]
+            
+
+        indices = np.arange(len(dataset))
+        
+        subset_indices, _ = train_test_split(
+            indices, 
+            train_size=subset_size, 
+            stratify=labels, 
+            random_state=seed,
+        )
+        
+        return Subset(dataset, subset_indices)
 
 

@@ -8,7 +8,7 @@ import yaml
 #                    "hito3_32_compresion_static_noisy_gaussian_05",
 #                    "hito3_32_compresion_static_noisy_oclussion_03",
 #                    "hito3_32_compresion_static_noisy_oclussion_05"]
-experiments_name = ["hito3_32_compresion_mlp_original"]
+experiments_name = ["hito3_32_compresion_mlp_original_v2"]
 
 for experiment_name in experiments_name:
     yaml_dir = os.path.join("experiments",f"{experiment_name}")
@@ -21,7 +21,7 @@ for experiment_name in experiments_name:
 
             seeds = exp_config["seeds"]
             for seed in seeds:
-                command = f"python -m src.hito3.train_and_test --experiment={yaml_path} --seed={seed} --train=False"
+                command = f"python -m src.hito3.train_and_test --experiment={yaml_path} --seed={seed} --get_histograms=True"
                 print(f'Running command: {command}')
 
                 time.sleep(2)

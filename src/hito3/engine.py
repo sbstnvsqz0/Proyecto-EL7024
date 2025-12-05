@@ -35,7 +35,7 @@ class EngineMLP:
         self.train_kl_loss = []
         self.val_kl_loss = []
 
-    def train(self,train_dataset,val_dataset):
+    def train(self,train_dataset,val_dataset,histogram_dataset):
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True,num_workers=4)
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False,num_workers=4)
         epoch_pbar = tqdm(range(self.epochs), desc="Epochs")
@@ -90,6 +90,10 @@ class EngineMLP:
                 self.val_kl_loss.append(val_epoch_kl_loss.item())
             except:
                 self.val_kl_loss.append(val_epoch_kl_loss)
+            
+            #Exportación de activaciones como numpy
+            if histogram_dataset is not None:
+                self.export_activations(histogram_dataset,epoch)
 
             epoch_pbar.set_postfix(
             train_loss=f"{train_loss:.4f}",
@@ -137,7 +141,8 @@ class EngineMLP:
 
         return dict_results
 
-    def export_relu_histogram(self,dataset):
+    def export_activations(self,dataset,epoch:int):
+        original_out_mlp = self.model.out_mlp
         self.model.out_mlp= nn.Identity()
         dataloader = DataLoader(dataset,batch_size=1,shuffle=False)
         self.model.eval()
@@ -147,15 +152,14 @@ class EngineMLP:
                 x, y = x.to(self.device), y.to(self.device)
                 output, kl_loss = self.model(x)
                 outputs.append(output.cpu().numpy())
-        ouputs = np.array(outputs).reshape(-1)
-        bin_width = 0.1
-        bins = np.arange(min(ouputs), max(ouputs) + bin_width, bin_width)
-        plt.hist(ouputs,bins=bins,density=True,histtype='step', linewidth=2, color='blue')
-        plt.xlim(0,2.5)
-        plt.ylim(0,2)
-        plt.savefig(os.path.join(self.save_plots_dir,f"relu_histogram_{self.seed}.png"))    
-        plt.close()
-        return outputs
+
+        activations = np.concatenate(outputs).reshape(-1)
+        #Se restaura modelo
+        self.model.out_mlp = original_out_mlp
+        #Se guardan los npy
+        npy_dir = os.path.join(self.save_plots_dir, "activations_npy")
+        os.makedirs(npy_dir, exist_ok=True)
+        np.save(os.path.join(npy_dir, f"epoch_{epoch:03d}.npy"), activations)
 
 
     def save_dict(self,epoch):

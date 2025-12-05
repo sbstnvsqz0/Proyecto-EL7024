@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import random
+import numpy as np
 
 class AddGaussianNoise(object):
     def __init__(self, std=0.0):
@@ -42,19 +43,31 @@ class DatasetLabelNoise(Dataset):
         self.p = p
         self.dataset_original = dataset_original
         self.dataset_original_y = dataset_original.targets
+        self.noise_mapping = {9:[7,4],4:9, 7:9, 3:[5,8],5:[3,8],8:[3,5],1:2,2:1,6:0,0:6} #Basado en cercanías mostradas en UMAP 
         if isinstance(self.dataset_original_y, torch.Tensor):
-            self.dataset_original_y = self.dataset_original_y.tolist()
+            self.dataset_original_y = self.dataset_original_y.numpy()
+        else:
+            self.dataset_original_y = np.array(self.dataset_original_y)
 
-        self.noise_mask = [random.random() < self.p for _ in range(len(self.original_labels))]
-        
-        self.new_labels = []
-        for i, y in enumerate(self.original_labels):
-            if not self.noise_mask[i]:
-                self.new_labels.append(y)
-            else:
-                noise_label = random.randint(1, self.num_classes - 1)
-                new_y = (y + noise_label) % self.num_classes
-                self.new_labels.append(new_y)
+        rng = np.random.default_rng(42)
+
+        self.noise_mask = [random.random() < self.p for _ in range(len(self.dataset_original_y))]
+        self.num_classes = 10 #Hardcodeada
+        self.new_labels = self.dataset_original_y.copy()
+        for source_c, target_c in self.noise_mapping.items():
+            targets = target_c if isinstance(target_c, list) else [target_c]
+            indices = np.where(self.dataset_original_y == source_c)[0]
+            total_flip_count = int(len(indices) * p)
+            if total_flip_count > 0:
+                rng.shuffle(indices)
+                indices_to_corrupt = indices[:total_flip_count]
+                target_chunks = np.array_split(indices_to_corrupt, len(targets))
+                for chunk_indices, target_label in zip(target_chunks, targets):
+                    self.new_labels[chunk_indices] = target_label
+
+        self.new_labels = self.new_labels.tolist()
+        actual_noise = np.mean(np.array(self.new_labels) != self.dataset_original_y)
+        print(f"Global noise: {actual_noise:.4f}")
 
     def __getitem__(self, idx):
         x,_=self.dataset_original[idx]
